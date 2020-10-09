@@ -35,13 +35,31 @@ class Table(DataBase):
         DataBase.__init__(self, dbname)
         # self.dbname = dbname
 
-    def create(self):
+    @staticmethod
+    def if_type(dictionary):
+        condition_query = ''
+        for key in dictionary:
+            if isinstance(dictionary[key], int) or isinstance(dictionary[key], float):
+                condition_query += key + '=' + str(dictionary[key])
+            else:
+                condition_query += key + "='" + dictionary[key] + "'"
+        return condition_query
+
+    def create(self, **kwargs):
         """ Create one table at a time simply from the name of the initialisation of the object """
 
         cur = self.cur
+        if len(kwargs) != 0:
+            condition_query = ''
+            for key in kwargs:
+                condition_query += key + ' ' + kwargs[key] + ', '
+            cat_string = ("CREATE TABLE " + self.name + "(id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,"
+                                                        + condition_query[:-2] + ")")
+        else:
+            cat_string = ("CREATE TABLE " + self.name + "(id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT)")
+        # print(cat_string)
         try:
-            # cur.execute('DROP TABLE IF EXISTS ' + each)
-            cur.execute('CREATE TABLE ' + self.name + '(id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT)')
+            cur.execute(cat_string)
             self.conn.commit()
             print("'{}' created successfully".format(self.name))
         except sqlite3.OperationalError as op:
@@ -51,8 +69,9 @@ class Table(DataBase):
         """ Deletes a table """
 
         cur = self.cur
+        cat_string = 'DROP TABLE ' + self.name
         try:
-            cur.execute('DROP TABLE ' + self.name)
+            cur.execute(cat_string)
             self.conn.commit()
             print("'{}' deleted successfully".format(self.name))
         except sqlite3.OperationalError as op:
@@ -64,45 +83,48 @@ class Table(DataBase):
         cur = self.cur
         new_name.rstrip()
         new_name = new_name.replace(' ', '_')
+        cat_string = ('ALTER TABLE ' + self.name + ' RENAME TO ' + new_name)
         try:
-            cur.execute('ALTER TABLE ' + self.name + ' RENAME TO ' + new_name)
+            cur.execute(cat_string)
             self.conn.commit()
             print("{} changed successfully into -> {}".format(self.name, new_name))
             Table.__init__(self, self.dbname, new_name)
         except sqlite3.OperationalError as op:
             print(op)
 
-    def insert_column(self, *columns):  # to be updated for type inputs
+    def insert_column(self, column, d_type=''):
         """ Create columns in the table object """
 
         cur = self.cur
-        for column in columns:
-            try:
-                cur.execute('ALTER TABLE ' + self.name + ' ADD ' + column)
-            except sqlite3.OperationalError as op:
-                print(op)
-                quit()
+        cat_string = ('ALTER TABLE ' + self.name + ' ADD ' + column + ' ' + d_type.upper())
+        print(cat_string)
+        try:
+            cur.execute(cat_string)
+            self.conn.commit()
             print("'{}' added successfully".format(column))
-        self.conn.commit()
+        except sqlite3.OperationalError as op:
+            print(op)
 
-    def drop_column(self, table, column): # to be updated
+    def drop_column(self, table, column):  # to be updated
         """ Drop a column or a series of columns """
 
         cur = self.cur
-        cur.execute('ALTER TABLE ' + table + ' DROP COLUMN ' + column)
+        cat_string = ('ALTER TABLE ' + table + ' DROP COLUMN ' + column)
+        cur.execute(cat_string)
 
     def rename_column(self, old_name, new_name):
         """ Change column name or columns """
 
         cur = self.cur
+        cat_string = ('ALTER TABLE ' + self.name + ' RENAME COLUMN ' + old_name + ' TO ' + new_name)
         try:
-            cur.execute('ALTER TABLE ' + self.name + ' RENAME COLUMN ' + old_name + ' TO ' + new_name)
+            cur.execute(cat_string)
             self.conn.commit()
             print("{} renamed successfully into -> {}".format(old_name, new_name))
         except sqlite3.OperationalError as op:
             print(op)
 
-    def add_data(self, columns: tuple or list, data: tuple or list):  # to be updated for type inputs
+    def add_data(self, columns: tuple or list, data: tuple or list):
         """As the name suggests it populates the rows in a specific table, namely the table object.
         It is important that the number of columns match the number of data per input and
         that the type of the two parameters remain iterables either tuples or lists """
@@ -125,8 +147,9 @@ class Table(DataBase):
             each = "'" + each + "',"
             data_string += each
         data_string = data_string[:-1]
+        cat_string = ("INSERT OR IGNORE INTO " + self.name + " (" + column_string + ") VALUES (" + data_string + ")")
         try:
-            cur.execute("INSERT OR IGNORE INTO " + self.name + " (" + column_string + ") VALUES (" + data_string + ")")
+            cur.execute(cat_string)
             self.conn.commit()
             print('Data uploaded successfully')
         except sqlite3.OperationalError as op:
@@ -136,7 +159,8 @@ class Table(DataBase):
     def and_or_query(dictionary: dict, _and=False, _or=False):
         condition_query = ''
         if _and and _or:
-            raise TypeError
+            print('Is either AND or OR!')
+            quit()
         elif _and:
             for key in dictionary:
                 if isinstance(dictionary[key], int) or isinstance(dictionary[key], float):
@@ -152,7 +176,8 @@ class Table(DataBase):
                     condition_query += key + "='" + dictionary[key] + "' OR "
             condition_query = condition_query[:-4]
         else:
-            pass
+            print('Is either AND or OR! ')
+            quit()
         return condition_query
 
     def fetch(self, *column, _and=False, _or=False, **kwargs):  # SELECT column FROM Table WHERE "...."
@@ -167,16 +192,13 @@ class Table(DataBase):
             for c in column:
                 column_string += c + ", "
             column_string = column_string[:-2]
-            # print('column string:', column_string): Debug
 
         # It writes the conditional part of the query if there is 0, one or more and it allows AND and OR statements
         if len(kwargs) == 0:
-            # print('SELECT ' + column_string + ' FROM ' + self.name): Debug
+            cat_string = ('SELECT ' + column_string + ' FROM ' + self.name)
             try:
-                cur.execute('SELECT ' + column_string + ' FROM ' + self.name)
+                cur.execute(cat_string)
                 result = cur.fetchall()
-                # for each in result:
-                #     print("{}".format(each))
                 return result
             except sqlite3.OperationalError as op:
                 print(op)
@@ -184,38 +206,31 @@ class Table(DataBase):
         elif len(kwargs) > 1:
             condition_query = Table.and_or_query(kwargs, _and, _or)
         else:
-            condition_query = ''
-            for key in kwargs:
-                if isinstance(kwargs[key], int) or isinstance(kwargs[key], float):
-                    condition_query += key + '=' + str(kwargs[key])
-                else:
-                    condition_query += key + "='" + kwargs[key] + "'"
-        # print("SELECT " + column_string + " FROM " + self.name + " WHERE " + condition_query): Debug
+            condition_query = Table.if_type(kwargs)
+        cat_string = ("SELECT " + column_string + " FROM " + self.name + " WHERE " + condition_query)
         try:
-            cur.execute("SELECT " + column_string + " FROM " + self.name + " WHERE " + condition_query)
+            cur.execute(cat_string)
             result = cur.fetchall()
-            # for each in result:
-            #     print("{}".format(each))
             return result
         except sqlite3.OperationalError as op:
             print(op)
 
     def fetch_all(self, *column, _and=False, _or=False, **kwargs):
-        result = Table.fetch(self, *column, _and=False, _or=False, **kwargs)
+        result = Table.fetch(self, *column, _and, _or, **kwargs)
         for each in result:
             print(each)
 
     def fetch_one(self, *column, _and=False, _or=False, **kwargs):
-        result = Table.fetch(self, *column, _and=False, _or=False, **kwargs)
+        result = Table.fetch(self, *column, _and, _or, **kwargs)
         print(result[0])
 
     def fetch_head(self, num=5, *column, _and=False, _or=False, **kwargs):
-        result = Table.fetch(self, *column, _and=False, _or=False, **kwargs)
+        result = Table.fetch(self, *column, _and, _or, **kwargs)
         for each in result[:num]:
             print(each)
 
     def fetch_tail(self, num=5, *column, _and=False, _or=False, **kwargs):
-        result = Table.fetch(self, *column, _and=False, _or=False, **kwargs)
+        result = Table.fetch(self, *column, _and, _or, **kwargs)
         for each in result[-num:]:
             print(each)
 
@@ -223,22 +238,17 @@ class Table(DataBase):
         """ It updates data into rows under a specific condition i.g: column=value """
 
         cur = self.cur
-        condition_query = ''
         if len(kwargs) == 0:
-            print('Please specify a condition')
-            quit()
+            raise TypeError
         elif len(kwargs) > 1:
             condition_query = Table.and_or_query(kwargs, _and, _or)
         else:
-            for key in kwargs:
-                if isinstance(kwargs[key], int) or isinstance(kwargs[key], float):
-                    condition_query += key + '=' + str(kwargs[key])
-                else:
-                    condition_query += key + "='" + kwargs[key] + "'"
+            condition_query = Table.if_type(kwargs)
+        cat_string = ("UPDATE " + self.name + " SET " + column + "='" + new_data + "' WHERE " + condition_query)
+
         try:
-            cur.execute("UPDATE " + self.name + " SET " + column + "='" + new_data + "' WHERE " + condition_query)
+            cur.execute(cat_string)
             self.conn.commit()
+            print('Data updated successfully')
         except sqlite3.OperationalError as op:
             print(op)
-            quit()
-        print('Data updated successfully')
