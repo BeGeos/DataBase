@@ -12,16 +12,18 @@ class DataBase:
     def db_schema(self):
         cur = self.cur
         cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        schema = (cur.fetchall())
+        schema = cur.fetchall()
         cache_tables = {}
         for table in schema:
             cur.execute("PRAGMA table_info ('" + table[0] + "')")
             result = cur.fetchall()
             cache_columns = []
             for column in result:
-                cache_columns.append(column[1])
+                cache_columns.append(column[1:])
             cache_tables[table[0]] = cache_columns
-        return cache_tables
+        for k in cache_tables:
+            if k != 'sqlite_sequence':
+                print(k, cache_tables[k])
 
     @staticmethod
     def print_sql():
@@ -30,9 +32,9 @@ class DataBase:
 
 class Table(DataBase):
 
-    def __init__(self, dbname, name):
+    def __init__(self, name):
         self.name = name
-        DataBase.__init__(self, dbname)
+        super().__init__('Table')
         # self.dbname = dbname
 
     @staticmethod
@@ -88,7 +90,7 @@ class Table(DataBase):
             cur.execute(cat_string)
             self.conn.commit()
             print("{} changed successfully into -> {}".format(self.name, new_name))
-            Table.__init__(self, self.dbname, new_name)
+            Table.__init__(self, new_name)
         except sqlite3.OperationalError as op:
             print(op)
 
@@ -97,7 +99,7 @@ class Table(DataBase):
 
         cur = self.cur
         cat_string = ('ALTER TABLE ' + self.name + ' ADD ' + column + ' ' + d_type.upper())
-        print(cat_string)
+        # print(cat_string)
         try:
             cur.execute(cat_string)
             self.conn.commit()
@@ -105,11 +107,27 @@ class Table(DataBase):
         except sqlite3.OperationalError as op:
             print(op)
 
-    def drop_column(self, table, column):  # to be updated
+    def insert_foreign_key(self, column_from, column_to, d_type):
+        """ It allows to create an individual column with the attribute foreign key.
+        It is essential to refer the table name in the column to as argument as Table_name.column_fk """
+
+        cur = self.cur
+        column_to = column_to.split('.')
+        fk = column_from + " " + d_type + " REFERENCES " + column_to[0] + "(" + column_to[1] + ")"
+        cat_string = "ALTER TABLE " + self.name + " ADD " + fk
+        # print(cat_string)
+        try:
+            cur.execute(cat_string)
+            self.conn.commit()
+            print('Foreign key added successfully')
+        except sqlite3.OperationalError as op:
+            print(op)
+
+    def drop_column(self, column): # to be updated
         """ Drop a column or a series of columns """
 
         cur = self.cur
-        cat_string = ('ALTER TABLE ' + table + ' DROP COLUMN ' + column)
+        cat_string = ('ALTER TABLE ' + self.name + ' DROP COLUMN ' + column)
         cur.execute(cat_string)
 
     def rename_column(self, old_name, new_name):
@@ -230,7 +248,7 @@ class Table(DataBase):
             print(each)
 
     def fetch_tail(self, num=5, *column, _and=False, _or=False, **kwargs):
-        result = Table.fetch(self, *column, _and, _or, **kwargs)
+        result = Table.fetch(self, *column, _and=False, _or=False, **kwargs)
         for each in result[-num:]:
             print(each)
 
