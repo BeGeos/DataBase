@@ -2,7 +2,7 @@ import sqlite3
 
 
 class DataBase:
-    print_string_sql = False
+    string_sql = False
 
     def __init__(self, dbname):
         self.dbname = dbname + '.sqlite'
@@ -21,20 +21,57 @@ class DataBase:
             for column in result:
                 cache_columns.append(column[1:])
             cache_tables[table[0]] = cache_columns
-        for k in cache_tables:
-            if k != 'sqlite_sequence':
-                print(k, cache_tables[k])
+        return cache_tables
+
+    def many_to_many(self, name, args: tuple or list, d_type: tuple or list):
+        """ To create relations many to many. It is important that the data are iterables and more
+        than 1. In addition, it is also essential to specify the column and the table it is referring to
+        in the args argument, in this way: Table.column. It is also recommended to rename the id column
+        in the main table not create overlaps or redundancies. """
+        if len(args) <= 1:
+            raise TypeError
+        elif len(args) != len(d_type):
+            raise TypeError
+        fk_string = ''
+        column_string = ''
+        d_type_string = ''
+        # It creates the first part of the SQL query to create the column and their data type and
+        # the second part of the query which match the foreign keys and the tables, all together
+        for each in zip(args, d_type):
+            parsed = each[0].split('.')
+            table = parsed[0]
+            column = parsed[1]
+            column_string += column + ","
+            d_type_string += column + " " + each[1] + " NOT NULL,"
+            fk_string += "FOREIGN KEY (" + column + ") REFERENCES " + table + "(" + column + "),"
+        unique_string = fk_string + "UNIQUE (" + column_string[:-1] + ")"
+        cat_string = "CREATE TABLE " + name + "(" + d_type_string + unique_string + ")"
+        if DataBase.string_sql:
+            print(cat_string)
+        else:
+            cur = self.cur
+            try:
+                cur.execute(cat_string)
+                self.conn.commit()
+                print("'{}' created successfully".format(name))
+            except sqlite3.OperationalError as op:
+                print(op)
 
     @staticmethod
-    def print_sql():
-        DataBase.print_string_sql = True
+    def print_sql(p=False):
+        if p:
+            DataBase.string_sql = True
+        else:
+            DataBase.string_sql = False
 
 
 class Table(DataBase):
 
-    def __init__(self, name):
+    def __init__(self, dbname, name):
+        name.rstrip()
+        name = name.replace(' ', '_')
         self.name = name
-        super().__init__('Table')
+        DataBase.__init__(self, dbname)
         # self.dbname = dbname
 
     @staticmethod
@@ -90,7 +127,7 @@ class Table(DataBase):
             cur.execute(cat_string)
             self.conn.commit()
             print("{} changed successfully into -> {}".format(self.name, new_name))
-            Table.__init__(self, new_name)
+            Table.__init__(self, self.dbname, new_name)
         except sqlite3.OperationalError as op:
             print(op)
 
@@ -99,7 +136,7 @@ class Table(DataBase):
 
         cur = self.cur
         cat_string = ('ALTER TABLE ' + self.name + ' ADD ' + column + ' ' + d_type.upper())
-        # print(cat_string)
+        print(cat_string)
         try:
             cur.execute(cat_string)
             self.conn.commit()
@@ -115,7 +152,7 @@ class Table(DataBase):
         column_to = column_to.split('.')
         fk = column_from + " " + d_type + " REFERENCES " + column_to[0] + "(" + column_to[1] + ")"
         cat_string = "ALTER TABLE " + self.name + " ADD " + fk
-        # print(cat_string)
+        print(cat_string)
         try:
             cur.execute(cat_string)
             self.conn.commit()
@@ -123,7 +160,7 @@ class Table(DataBase):
         except sqlite3.OperationalError as op:
             print(op)
 
-    def drop_column(self, column): # to be updated
+    def drop_column(self, column):  # to be updated
         """ Drop a column or a series of columns """
 
         cur = self.cur
@@ -142,17 +179,19 @@ class Table(DataBase):
         except sqlite3.OperationalError as op:
             print(op)
 
-    def add_data(self, columns: tuple or list, data: tuple or list):
+    def add_record(self, columns: tuple or list, data: tuple or list):
         """As the name suggests it populates the rows in a specific table, namely the table object.
         It is important that the number of columns match the number of data per input and
         that the type of the two parameters remain iterables either tuples or lists """
 
-        if len(columns) != len(data):
+        if len(columns) == 0:
+            print('No record to be added')
+            quit()
+        elif len(columns) != len(data):
             print('Number mismatch between columns and data')
             quit()
 
         cur = self.cur
-
         column_string = ''
         data_string = ''
         for column in columns:
@@ -198,7 +237,7 @@ class Table(DataBase):
             quit()
         return condition_query
 
-    def fetch(self, *column, _and=False, _or=False, **kwargs):  # SELECT column FROM Table WHERE "...."
+    def fetch_all(self, column=(), _and=False, _or=False, **kwargs):  # SELECT column FROM Table WHERE ""
         """ Write a query in the database """
 
         cur = self.cur
@@ -233,24 +272,23 @@ class Table(DataBase):
         except sqlite3.OperationalError as op:
             print(op)
 
-    def fetch_all(self, *column, _and=False, _or=False, **kwargs):
-        result = Table.fetch(self, *column, _and, _or, **kwargs)
-        for each in result:
-            print(each)
+    def fetch_one(self, column=(), _and=False, _or=False, **kwargs):
+        result = Table.fetch_all(self, column, _and, _or, **kwargs)
+        if len(result) != 0:
+            return result[0]
+        print('No records found')
 
-    def fetch_one(self, *column, _and=False, _or=False, **kwargs):
-        result = Table.fetch(self, *column, _and, _or, **kwargs)
-        print(result[0])
+    def fetch_head(self, num=5, column=(), _and=False, _or=False, **kwargs):
+        result = Table.fetch_all(self, column, _and, _or, **kwargs)
+        if len(result) != 0:
+            return result[:num]
+        print('No records found')
 
-    def fetch_head(self, num=5, *column, _and=False, _or=False, **kwargs):
-        result = Table.fetch(self, *column, _and, _or, **kwargs)
-        for each in result[:num]:
-            print(each)
-
-    def fetch_tail(self, num=5, *column, _and=False, _or=False, **kwargs):
-        result = Table.fetch(self, *column, _and=False, _or=False, **kwargs)
-        for each in result[-num:]:
-            print(each)
+    def fetch_tail(self, num=5, column=(), _and=False, _or=False, **kwargs):
+        result = Table.fetch_all(self, column, _and, _or, **kwargs)
+        if len(result) != 0:
+            return result[-num:]
+        print('No records found')
 
     def update_data(self, column, new_data, _and=False, _or=False, **kwargs):  # to be updated AND and OR together
         """ It updates data into rows under a specific condition i.g: column=value """
