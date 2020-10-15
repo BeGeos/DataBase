@@ -2,20 +2,26 @@ import sqlite3
 
 
 class DataBase:
-    string_sql = False
 
-    def __init__(self, dbname):
+    def __init__(self, dbname, echo=False):
         self.dbname = dbname + '.sqlite'
+        self.echo = echo
         self.conn = sqlite3.connect(self.dbname)
         self.cur = self.conn.cursor()
 
     def db_schema(self):
         cur = self.cur
-        cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        query = "SELECT name FROM sqlite_master WHERE type='table'"
+        if self.echo:
+            print(query)
+        cur.execute(query)
         schema = cur.fetchall()
         cache_tables = {}
         for table in schema:
-            cur.execute("PRAGMA table_info ('" + table[0] + "')")
+            iterate_query = "PRAGMA table_info ('" + table[0] + "')"
+            cur.execute(iterate_query)
+            if self.echo:
+                print(iterate_query)
             result = cur.fetchall()
             cache_columns = []
             for column in result:
@@ -23,21 +29,14 @@ class DataBase:
             cache_tables[table[0]] = cache_columns
         return cache_tables
 
-    @staticmethod
-    def print_sql(p=False):
-        if p:
-            DataBase.string_sql = True
-        else:
-            DataBase.string_sql = False
-
 
 class Table(DataBase):
 
-    def __init__(self, dbname, name):
+    def __init__(self, dbname, name, echo=False):
         name.rstrip()
         name = name.replace(' ', '_')
         self.name = name
-        DataBase.__init__(self, dbname)
+        DataBase.__init__(self, dbname, echo)
         # self.dbname = dbname
 
     @staticmethod
@@ -52,17 +51,19 @@ class Table(DataBase):
 
     def create(self, **kwargs):
         """ Create one table at a time simply from the name of the initialisation of the object """
-
+        print(self.echo)
         cur = self.cur
         if len(kwargs) != 0:
             condition_query = ''
             for key in kwargs:
                 condition_query += key + ' ' + kwargs[key] + ', '
             cat_string = ("CREATE TABLE " + self.name + "(id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,"
-                          + condition_query[:-2] + ")")
+                                                        + condition_query[:-2] + ")")
         else:
             cat_string = ("CREATE TABLE " + self.name + "(id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT)")
-        # print(cat_string)
+        if self.echo:
+            print(cat_string)
+            return
         try:
             cur.execute(cat_string)
             self.conn.commit()
@@ -75,6 +76,9 @@ class Table(DataBase):
 
         cur = self.cur
         cat_string = 'DROP TABLE ' + self.name
+        if self.echo:
+            print(cat_string)
+            return
         try:
             cur.execute(cat_string)
             self.conn.commit()
@@ -89,6 +93,9 @@ class Table(DataBase):
         new_name.rstrip()
         new_name = new_name.replace(' ', '_')
         cat_string = ('ALTER TABLE ' + self.name + ' RENAME TO ' + new_name)
+        if self.echol:
+            print(cat_string)
+            return
         try:
             cur.execute(cat_string)
             self.conn.commit()
@@ -104,7 +111,9 @@ class Table(DataBase):
         column.rstrip()
         column = column.replace(' ', '_')
         cat_string = ('ALTER TABLE ' + self.name + ' ADD ' + column + ' ' + d_type.upper())
-        print(cat_string)
+        if self.echo:
+            print(cat_string)
+            return
         try:
             cur.execute(cat_string)
             self.conn.commit()
@@ -122,7 +131,9 @@ class Table(DataBase):
         column_to = column_to.split('.')
         fk = column_from + " " + d_type + " REFERENCES " + column_to[0] + "(" + column_to[1] + ")"
         cat_string = "ALTER TABLE " + self.name + " ADD " + fk
-        print(cat_string)
+        if self.echo:
+            print(cat_string)
+            return
         try:
             cur.execute(cat_string)
             self.conn.commit()
@@ -150,26 +161,30 @@ class Table(DataBase):
             table = parsed[0]
             column = parsed[1]
             column_string += column + ","
-            d_type_string += column + " " + each[1] + " NOT NULL,"
-            fk_string += "FOREIGN KEY (" + column + ") REFERENCES " + table + "(" + column + "),"
+            d_type_string += column + " " + each[1] + " NOT NULL,\n"
+            fk_string += "FOREIGN KEY (" + column + ") REFERENCES " + table + "(" + column + "),\n"
         unique_string = fk_string + "UNIQUE (" + column_string[:-1] + ")"
         cat_string = "CREATE TABLE " + self.name + "(" + d_type_string + unique_string + ")"
-        if DataBase.string_sql:
+        if self.echo:
             print(cat_string)
-        else:
-            cur = self.cur
-            try:
-                cur.execute(cat_string)
-                self.conn.commit()
-                print("'{}' created successfully".format(self.name))
-            except sqlite3.OperationalError as op:
-                print(op)
+            return
+        cur = self.cur
+        try:
+            cur.execute(cat_string)
+            self.conn.commit()
+            print("'{}' created successfully".format(self.name))
+        except sqlite3.OperationalError as op:
+            print(op)
 
     def delete_column(self, column):  # to be updated
         """ Drop a column or a series of columns """
 
-        cur = self.cur
         cat_string = ('ALTER TABLE ' + self.name + ' DROP COLUMN ' + column)
+        if self.echo:
+            print(cat_string)
+            return
+
+        cur = self.cur
         cur.execute(cat_string)
 
     def rename_column(self, old_name, new_name):
@@ -177,6 +192,9 @@ class Table(DataBase):
 
         cur = self.cur
         cat_string = ('ALTER TABLE ' + self.name + ' RENAME COLUMN ' + old_name + ' TO ' + new_name)
+        if self.echo:
+            print(cat_string)
+            return
         try:
             cur.execute(cat_string)
             self.conn.commit()
@@ -209,7 +227,10 @@ class Table(DataBase):
             each = "'" + each + "',"
             data_string += each
         data_string = data_string[:-1]
-        cat_string = ("INSERT OR IGNORE INTO " + self.name + " (" + column_string + ") VALUES (" + data_string + ")")
+        cat_string = ("INSERT INTO " + self.name + " (" + column_string + ") VALUES (" + data_string + ")")
+        if self.echo:
+            print(cat_string)
+            return
         try:
             cur.execute(cat_string)
             self.conn.commit()
@@ -261,6 +282,9 @@ class Table(DataBase):
                 cat_string = 'SELECT ' + column_string + ' FROM ' + self.name + ' LIMIT ' + str(num)
             else:
                 cat_string = ('SELECT ' + column_string + ' FROM ' + self.name)
+            if self.echo:
+                print(cat_string)
+                return
             try:
                 cur.execute(cat_string)
                 result = cur.fetchall()
@@ -274,7 +298,10 @@ class Table(DataBase):
             condition_query = Table.if_type(kwargs)
         cat_string = ("SELECT " + column_string + " FROM " + self.name + " WHERE " + condition_query)
         if num != 0:
-            cat_string = cat_string + " LIMIT " + str(num)
+            cat_string = cat_string + "LIMIT " + str(num)
+        if self.echo:
+            print(cat_string)
+            return
         try:
             cur.execute(cat_string)
             result = cur.fetchall()
@@ -303,6 +330,9 @@ class Table(DataBase):
             else:
                 cat_string = "SELECT " + column_string + " FROM " + self.name + " JOIN " + table + \
                              " USING (" + key + ")"
+            if self.echo:
+                print(cat_string)
+                return
             try:
                 cur.execute(cat_string)
                 result = cur.fetchall()
@@ -319,6 +349,9 @@ class Table(DataBase):
                      " USING (" + key + ") WHERE " + condition_query
         if num != 0:
             cat_string = cat_string + " LIMIT " + str(num)
+        if self.echo:
+            print(cat_string)
+            return
         try:
             cur.execute(cat_string)
             result = cur.fetchall()
@@ -337,7 +370,9 @@ class Table(DataBase):
         else:
             condition_query = Table.if_type(kwargs)
         cat_string = ("UPDATE " + self.name + " SET " + column + "='" + new_data + "' WHERE " + condition_query)
-
+        if self.echo:
+            print(cat_string)
+            return
         try:
             cur.execute(cat_string)
             self.conn.commit()
