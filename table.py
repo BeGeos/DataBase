@@ -1,43 +1,48 @@
-import sqlite3
+import mysql.connector
+from Database import config
 
 
 class DataBase:
 
     def __init__(self, dbname, echo=False):
-        self.dbname = dbname + '.sqlite'
+        self.dbname = dbname
         self.echo = echo
-        self.conn = sqlite3.connect(self.dbname)
+        self.conn = mysql.connector.connect(host=config.host,
+                                            user=config.user,
+                                            passwd=config.password)
         self.cur = self.conn.cursor()
 
-    def db_schema(self):
-        cur = self.cur
-        query = "SELECT name FROM sqlite_master WHERE type='table'"
-        if self.echo:
-            print(query)
-        cur.execute(query)
-        schema = cur.fetchall()
-        cache_tables = {}
-        for table in schema:
-            iterate_query = "PRAGMA table_info ('" + table[0] + "')"
-            cur.execute(iterate_query)
-            if self.echo:
-                print(iterate_query)
-            result = cur.fetchall()
-            cache_columns = []
-            for column in result:
-                cache_columns.append(column[1:])
-            cache_tables[table[0]] = cache_columns
-        return cache_tables
+    def create_db(self):
+        """ Create a database from the instance. It stills need to be called """
+
+        create_string = "CREATE DATABASE " + self.dbname
+        try:
+            self.cur.execute(create_string)
+        except mysql.connector.Error as err:
+            print(err)
+
+    def delete_db(self):
+        delete_string = "DROP DATABASE " + self.dbname
+        try:
+            self.cur.execute(delete_string)
+        except mysql.connector.Error as err:
+            print(err)
 
 
-class Table(DataBase):
+class Table:
 
     def __init__(self, dbname, name, echo=False):
-        name.rstrip()
-        name = name.replace(' ', '_')
         self.name = name
-        DataBase.__init__(self, dbname, echo)
-        # self.dbname = dbname
+        self.echo = echo
+        self.dbname = dbname
+        try:
+            self.conn = mysql.connector.connect(host=config.host,
+                                                user=config.user,
+                                                passwd=config.password,
+                                                database=dbname)
+            self.cur = self.conn.cursor()
+        except mysql.connector.Error as err:
+            print(err)
 
     @staticmethod
     def if_type(dictionary):
@@ -51,63 +56,72 @@ class Table(DataBase):
 
     def create(self, **kwargs):
         """ Create one table at a time simply from the name of the initialisation of the object """
-        print(self.echo)
-        cur = self.cur
         if len(kwargs) != 0:
             condition_query = ''
             for key in kwargs:
                 condition_query += key + ' ' + kwargs[key] + ', '
-            cat_string = ("CREATE TABLE " + self.name + "(id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,"
+            cat_string = ("CREATE TABLE " + self.name + "(id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT,"
                                                         + condition_query[:-2] + ")")
         else:
-            cat_string = ("CREATE TABLE " + self.name + "(id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT)")
+            cat_string = ("CREATE TABLE " + self.name + "(id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT)")
         if self.echo:
             print(cat_string)
             return
         try:
-            cur.execute(cat_string)
+            self.cur.execute(cat_string)
             self.conn.commit()
             print("'{}' created successfully".format(self.name))
-        except sqlite3.OperationalError as op:
-            print(op)
+            self.conn.close()
+        except mysql.connector.Error as err:
+            print(err)
+
+    def describe(self):
+        """ Description of Table schema  """
+
+        joint = '.'.join([self.dbname, self.name])
+        string = "DESCRIBE " + joint
+        if self.echo:
+            print(string)
+            return
+        self.cur.execute(string)
+        return self.cur.fetchall()
 
     def delete(self):
         """ Deletes a table """
 
-        cur = self.cur
         cat_string = 'DROP TABLE ' + self.name
         if self.echo:
             print(cat_string)
             return
         try:
-            cur.execute(cat_string)
+            self.cur.execute(cat_string)
             self.conn.commit()
             print("'{}' deleted successfully".format(self.name))
-        except sqlite3.OperationalError as op:
-            print(op)
+            self.conn.close()
+        except mysql.connector.Error as err:
+            print(err)
 
     def rename(self, new_name):
         """ Just change the name of a table """
 
-        cur = self.cur
         new_name.rstrip()
         new_name = new_name.replace(' ', '_')
         cat_string = ('ALTER TABLE ' + self.name + ' RENAME TO ' + new_name)
-        if self.echol:
+        if self.echo:
             print(cat_string)
             return
         try:
-            cur.execute(cat_string)
+            self.cur.execute(cat_string)
             self.conn.commit()
             print("{} changed successfully into -> {}".format(self.name, new_name))
+            self.conn.close()
             Table.__init__(self, self.dbname, new_name)
-        except sqlite3.OperationalError as op:
-            print(op)
+        except mysql.connector.Error as err:
+            print(err)
 
     def insert_column(self, column, d_type=''):
         """ Create columns in the table object one at a time """
 
-        cur = self.cur
         column.rstrip()
         column = column.replace(' ', '_')
         cat_string = ('ALTER TABLE ' + self.name + ' ADD ' + column + ' ' + d_type.upper())
@@ -115,19 +129,19 @@ class Table(DataBase):
             print(cat_string)
             return
         try:
-            cur.execute(cat_string)
+            self.cur.execute(cat_string)
             self.conn.commit()
             print("'{}' added successfully".format(column))
-        except sqlite3.OperationalError as op:
-            print(op)
+            self.conn.close()
+        except mysql.connector.Error as err:
+            print(err)
 
     def insert_foreign_key(self, column_from, column_to, d_type):
         """ It allows to create an individual column with the attribute foreign key.
-        It is essential to refer the table name in the column_to as argument as Table_name.column_fk.
-         It is also a best practice to have the names of both foreign keys identical to simply
+        It is essential to refer the table name in the column_to as Table_name.column_fk.
+         It is also a best practice to have the names of both foreign keys identical to simplify
          the search. See join_search"""
 
-        cur = self.cur
         column_to = column_to.split('.')
         fk = column_from + " " + d_type + " REFERENCES " + column_to[0] + "(" + column_to[1] + ")"
         cat_string = "ALTER TABLE " + self.name + " ADD " + fk
@@ -135,20 +149,21 @@ class Table(DataBase):
             print(cat_string)
             return
         try:
-            cur.execute(cat_string)
+            self.cur.execute(cat_string)
             self.conn.commit()
             print('Foreign key added successfully')
-        except sqlite3.OperationalError as op:
-            print(op)
+            self.conn.close()
+        except mysql.connector.Error as err:
+            print(err)
 
-    def many_to_many(self, keys: tuple or list, d_type: tuple or list):  # tbu as dictionary
-        """ To create relations many to many. It is important that the data are iterables and more
-        than 1. In addition, it is also essential to specify the column and the table it is referring to
+    def many_to_many(self, keys: tuple or list, d_type: tuple or list):
+        """ To create relations many to many. It is important that the data are iterables with more
+        than 1 element. In addition, it is also essential to specify the column and the table it is referring to
         in the args argument, in this way: Table.column. It is also recommended to rename the id column
         in the main table not create overlaps or redundancies. """
 
         if len(keys) <= 1:
-            raise TypeError
+            raise Exception('Not enough elements found')
         elif len(keys) != len(d_type):
             raise TypeError
         fk_string = ''
@@ -164,17 +179,17 @@ class Table(DataBase):
             d_type_string += column + " " + each[1] + " NOT NULL,\n"
             fk_string += "FOREIGN KEY (" + column + ") REFERENCES " + table + "(" + column + "),\n"
         unique_string = fk_string + "UNIQUE (" + column_string[:-1] + ")"
-        cat_string = "CREATE TABLE " + self.name + "(" + d_type_string + unique_string + ")"
+        cat_string = "CREATE TABLE " + self.name + " (" + d_type_string + unique_string + ")"
         if self.echo:
             print(cat_string)
             return
-        cur = self.cur
         try:
-            cur.execute(cat_string)
+            self.cur.execute(cat_string)
             self.conn.commit()
             print("'{}' created successfully".format(self.name))
-        except sqlite3.OperationalError as op:
-            print(op)
+            self.conn.close()
+        except mysql.connector.Error as err:
+            print(err)
 
     def delete_column(self, column):  # to be updated
         """ Drop a column or a series of columns """
@@ -183,24 +198,28 @@ class Table(DataBase):
         if self.echo:
             print(cat_string)
             return
-
-        cur = self.cur
-        cur.execute(cat_string)
+        try:
+            self.cur.execute(cat_string)
+            self.conn.commit()
+            print("'{}' deleted successfully".format(self.name))
+            self.conn.close()
+        except mysql.connector.Error as err:
+            print(err)
 
     def rename_column(self, old_name, new_name):
         """ Change column name or columns """
 
-        cur = self.cur
         cat_string = ('ALTER TABLE ' + self.name + ' RENAME COLUMN ' + old_name + ' TO ' + new_name)
         if self.echo:
             print(cat_string)
             return
         try:
-            cur.execute(cat_string)
+            self.cur.execute(cat_string)
             self.conn.commit()
             print("{} renamed successfully into -> {}".format(old_name, new_name))
-        except sqlite3.OperationalError as op:
-            print(op)
+            self.conn.close()
+        except mysql.connector.Error as err:
+            print(err)
 
     def add_record(self, columns: tuple or list, data: tuple or list):
         """As the name suggests it populates the rows in a specific table, namely the table object.
@@ -214,7 +233,6 @@ class Table(DataBase):
             print('Number mismatch between columns and data')
             quit()
 
-        cur = self.cur
         column_string = ''
         data_string = ''
         for column in columns:
@@ -232,11 +250,14 @@ class Table(DataBase):
             print(cat_string)
             return
         try:
-            cur.execute(cat_string)
+            self.cur.execute(cat_string)
             self.conn.commit()
             print('Data uploaded successfully')
-        except sqlite3.OperationalError as op:
-            print(op)
+            self.conn.close()
+        except mysql.connector.Error as err:
+            print(err)
+
+    # def add_record_via_dictionary():  to be updated
 
     @staticmethod
     def and_or_query(dictionary: dict, _and=False, _or=False):
@@ -263,10 +284,9 @@ class Table(DataBase):
             quit()
         return condition_query
 
-    def fetch(self, num=0, column=(), _and=False, _or=False, **kwargs):  # SELECT column FROM Table WHERE ""
+    def fetch(self, num=-1, column=(), _and=False, _or=False, **kwargs):  # SELECT column FROM Table WHERE ""
         """ Write a query in the database """
 
-        cur = self.cur
         # It writes the column part of the query
         column_string = ''
         if len(column) == 0:
@@ -278,7 +298,7 @@ class Table(DataBase):
 
         # It writes the conditional part of the query if there is 0, one or more and it allows AND and OR statements
         if len(kwargs) == 0:
-            if num != 0:
+            if num != -1:
                 cat_string = 'SELECT ' + column_string + ' FROM ' + self.name + ' LIMIT ' + str(num)
             else:
                 cat_string = ('SELECT ' + column_string + ' FROM ' + self.name)
@@ -286,34 +306,33 @@ class Table(DataBase):
                 print(cat_string)
                 return
             try:
-                cur.execute(cat_string)
-                result = cur.fetchall()
+                self.cur.execute(cat_string)
+                result = self.cur.fetchall()
                 return result
-            except sqlite3.OperationalError as op:
-                print(op)
+            except mysql.connector.Error as err:
+                print(err)
                 quit()
         elif len(kwargs) > 1:
             condition_query = Table.and_or_query(kwargs, _and, _or)
         else:
             condition_query = Table.if_type(kwargs)
         cat_string = ("SELECT " + column_string + " FROM " + self.name + " WHERE " + condition_query)
-        if num != 0:
+        if num != -1:
             cat_string = cat_string + "LIMIT " + str(num)
         if self.echo:
             print(cat_string)
             return
         try:
-            cur.execute(cat_string)
-            result = cur.fetchall()
+            self.cur.execute(cat_string)
+            result = self.cur.fetchall()
             return result
-        except sqlite3.OperationalError as op:
-            print(op)
+        except mysql.connector.Error as err:
+            print(err)
 
-    def join_search(self, table, key, column: tuple or list, num=0, _and=False, _or=False, **kwargs):
+    def join_search(self, table, f_key, column: tuple or list, num=-1, _and=False, _or=False, **kwargs):
         """ Implementing join search in SQL database. Make sure that the key name is identical
          in the table you want to join """
 
-        cur = self.cur
         # It writes the column part of the query
         column_string = ''
         if len(column) == 0:
@@ -324,21 +343,21 @@ class Table(DataBase):
             column_string = column_string[:-2]
         # It write the conditional part of the query WHERE = ...
         if len(kwargs) == 0:
-            if num != 0:
+            if num != -1:
                 cat_string = "SELECT " + column_string + " FROM " + self.name + " JOIN " + table + \
-                             " USING (" + key + ") LIMIT " + str(num)
+                             " USING (" + f_key + ") LIMIT " + str(num)
             else:
                 cat_string = "SELECT " + column_string + " FROM " + self.name + " JOIN " + table + \
-                             " USING (" + key + ")"
+                             " USING (" + f_key + ")"
             if self.echo:
                 print(cat_string)
                 return
             try:
-                cur.execute(cat_string)
-                result = cur.fetchall()
+                self.cur.execute(cat_string)
+                result = self.cur.fetchall()
                 return result
-            except sqlite3.OperationalError as op:
-                print(op)
+            except mysql.connector.Error as err:
+                print(err)
                 quit()
         elif len(kwargs) > 1:
             condition_query = Table.and_or_query(kwargs, _and, _or)
@@ -346,23 +365,50 @@ class Table(DataBase):
             condition_query = Table.if_type(kwargs)
 
         cat_string = "SELECT " + column_string + " FROM " + self.name + " JOIN " + table + \
-                     " USING (" + key + ") WHERE " + condition_query
-        if num != 0:
+                     " USING (" + f_key + ") WHERE " + condition_query
+        if num != -1:
             cat_string = cat_string + " LIMIT " + str(num)
         if self.echo:
             print(cat_string)
             return
         try:
-            cur.execute(cat_string)
-            result = cur.fetchall()
+            self.cur.execute(cat_string)
+            result = self.cur.fetchall()
             return result
-        except sqlite3.OperationalError as op:
-            print(op)
+        except mysql.connector.Error as err:
+            print(err)
 
-    def update_data(self, column, new_data, _and=False, _or=False, **kwargs):  # to be updated AND and OR together
+    def regexp_search(self, num=-1, **kwargs):  # SELECT * FROM Table WHERE column REGEXP ....
+        """ It allows to search via regular expression in SQL. The condition must be 1 only as key:value pair.
+         Reminder: * Zero or more instances of string preceding it
+                   + One or more instances of strings preceding it
+                   . Any single character
+                   ? Match zero or one instance of the strings preceding it
+                   ^ Matches beginning of a string
+                   $ End of a string
+                   [a-z][0-9] Match a range of letters or numbers (SQL is case sensitive)
+                   string1|string2|string(n) Logical OR """
+
+        cond_list = list(kwargs.items())
+        query = "SELECT * FROM " + self.name + " WHERE " + cond_list[0][0] + " REGEXP '" + cond_list[0][1] + "' "
+        if num != -1:
+            limit_string = "LIMIT " + str(num)
+            final_query = query + limit_string
+        else:
+            final_query = query
+        if self.echo:
+            print(final_query)
+            return
+        try:
+            self.cur.execute(final_query)
+            result = self.cur.fetchall()
+            return result
+        except mysql.connector.Error as err:
+            print(err)
+
+    def update_record(self, column, new_data, _and=False, _or=False, **kwargs):  # to be updated AND and OR together
         """ It updates data into rows under a specific condition i.g: column=value """
 
-        cur = self.cur
         if len(kwargs) == 0:
             raise TypeError
         elif len(kwargs) > 1:
@@ -374,8 +420,37 @@ class Table(DataBase):
             print(cat_string)
             return
         try:
-            cur.execute(cat_string)
+            self.cur.execute(cat_string)
             self.conn.commit()
             print('Data updated successfully')
-        except sqlite3.OperationalError as op:
-            print(op)
+            self.conn.close()
+        except mysql.connector.Error as err:
+            print(err)
+
+    def delete_record(self, num=1, **condition):
+        """ It deletes record from a table and by default it is set at 1 record. Deleting is quite
+        dangerous therefore I recommend not to change the default value. However, if you really want
+        you can set the number of records to delete in one go. To delete all record with a certain
+        condition just set num to -1 """
+
+        cond_string = list(condition.items())
+        del_string = "DELETE FROM " + self.name + " WHERE " + cond_string[0][0] + "=" + cond_string[0][1]
+        if num == 1:
+            final_string = del_string + " LIMIT 1"
+        elif num > 1:
+            final_string = del_string + " LIMIT " + str(num)
+        elif num == -1:  # This will delete ALL records with the set condition
+            final_string = del_string
+        else:
+            print('The limit is not a valid number')
+            quit()
+        if self.echo:
+            print(final_string)
+            return
+        try:
+            self.cur.execute(final_string)
+            self.conn.commit()
+            print("Record/s deleted successfully")
+            self.conn.close()
+        except mysql.connector.Error as err:
+            print(err)
