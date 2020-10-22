@@ -4,6 +4,3 @@
 host = ''
 user = ''
 password = ''
-
-
-

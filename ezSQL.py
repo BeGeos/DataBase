@@ -18,6 +18,7 @@ class DataBase:
         create_string = "CREATE DATABASE " + self.dbname
         try:
             self.cur.execute(create_string)
+            print("'{}' created successfully".format(self.dbname))
         except mysql.connector.Error as err:
             print(err)
 
@@ -25,6 +26,7 @@ class DataBase:
         delete_string = "DROP DATABASE " + self.dbname
         try:
             self.cur.execute(delete_string)
+            print("'{}' deleted successfully".format(self.dbname))
         except mysql.connector.Error as err:
             print(err)
 
@@ -113,13 +115,13 @@ class Table:
         try:
             self.cur.execute(cat_string)
             self.conn.commit()
-            print("{} changed successfully into -> {}".format(self.name, new_name))
+            print("{} changed successfully into => {}".format(self.name, new_name))
             self.conn.close()
             Table.__init__(self, self.dbname, new_name)
         except mysql.connector.Error as err:
             print(err)
 
-    def insert_column(self, column, d_type=''):
+    def insert_column(self, column, d_type):
         """ Create columns in the table object one at a time """
 
         column.rstrip()
@@ -136,14 +138,12 @@ class Table:
         except mysql.connector.Error as err:
             print(err)
 
-    def insert_foreign_key(self, column_from, column_to, d_type):
+    def insert_foreign_key(self, column_fk, table_name, d_type):
         """ It allows to create an individual column with the attribute foreign key.
-        It is essential to refer the table name in the column_to as Table_name.column_fk.
          It is also a best practice to have the names of both foreign keys identical to simplify
          the search. See join_search"""
 
-        column_to = column_to.split('.')
-        fk = column_from + " " + d_type + " REFERENCES " + column_to[0] + "(" + column_to[1] + ")"
+        fk = column_fk + " " + d_type.upper() + " REFERENCES " + table_name + "(" + column_fk + ")"
         cat_string = "ALTER TABLE " + self.name + " ADD " + fk
         if self.echo:
             print(cat_string)
@@ -191,8 +191,8 @@ class Table:
         except mysql.connector.Error as err:
             print(err)
 
-    def delete_column(self, column):  # to be updated
-        """ Drop a column or a series of columns """
+    def delete_column(self, column):
+        """ Drop a column """
 
         cat_string = ('ALTER TABLE ' + self.name + ' DROP COLUMN ' + column)
         if self.echo:
@@ -216,7 +216,7 @@ class Table:
         try:
             self.cur.execute(cat_string)
             self.conn.commit()
-            print("{} renamed successfully into -> {}".format(old_name, new_name))
+            print("{} renamed successfully into => {}".format(old_name, new_name))
             self.conn.close()
         except mysql.connector.Error as err:
             print(err)
@@ -227,11 +227,9 @@ class Table:
         that the type of the two parameters remain iterables either tuples or lists """
 
         if len(columns) == 0:
-            print('No record to be added')
-            quit()
+            raise ValueError('No record to be added')
         elif len(columns) != len(data):
-            print('Number mismatch between columns and data')
-            quit()
+            raise ValueError('Number mismatch between columns and data')
 
         column_string = ''
         data_string = ''
