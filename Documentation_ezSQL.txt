@@ -103,7 +103,7 @@ Employees
 It inserts columns into a table. It is recommended to insert one column at a time and, again, in mysql a data type must be provided.
 
 	column: It's the name the column will have. 
-	d_type: The data type of the column. To see data types accepted in mysql, please refer to 		"create" (method) above
+	d_type: The data type of the column. To see data types accepted in mysql, please 		refer to "create" (method) above
 
 >>> emp.insert_column("role", "varchar(20)")
 'role' added successfully
