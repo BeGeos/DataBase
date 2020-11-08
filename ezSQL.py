@@ -1,5 +1,5 @@
 import mysql.connector
-from . import config
+import config
 
 
 class DataBase:
@@ -56,16 +56,37 @@ class Table:
                 condition_query += key + "='" + dictionary[key] + "'"
         return condition_query
 
-    def create(self, **kwargs):
-        """ Create one table at a time simply from the name of the initialisation of the object """
-        if len(kwargs) != 0:
+    def create(self, default=True, p_key=None, **kwargs):
+        """ Create one table at a time simply from the name of the initialisation of the object
+        You can also create your own primary key, just set uid=False, and indicate the column that
+        will be the primary key. Beware: this action will not set the auto_increment option to your
+        primary key. """
+
+        first_id = self.name + '_id'
+        if default and len(kwargs) != 0:
             condition_query = ''
             for key in kwargs:
-                condition_query += key + ' ' + kwargs[key] + ', '
-            cat_string = ("CREATE TABLE " + self.name + "(id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT,"
-                                                        + condition_query[:-2] + ")")
+                condition_query += key + ' ' + kwargs[key].upper() + ', '
+            cat_string = ("CREATE TABLE " + self.name + " (" + first_id.lower() +
+                          " INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT," +
+                          condition_query[:-2] + ")")
+        elif default and len(kwargs) == 0:
+            cat_string = ("CREATE TABLE " + self.name + " (" + first_id +
+                          " INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT)")
+        elif not default and len(kwargs) != 0:
+            if p_key is None:
+                raise ValueError('-- There must be a primary key, please specify --')
+            condition_query = ''
+            for key in kwargs:
+                if key == p_key:
+                    condition_query += key + ' ' + kwargs[key].upper() + ' NOT NULL PRIMARY KEY, '
+                else:
+                    condition_query += key + ' ' + kwargs[key].upper() + ', '
+            cat_string = ("CREATE TABLE " + self.name + " (" + condition_query[:-2] + ")")
+        elif not default and len(kwargs) == 0:
+            raise ValueError('Cannot create table with [0] columns!')
         else:
-            cat_string = ("CREATE TABLE " + self.name + "(id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT)")
+            cat_string = None
         if self.echo:
             print(cat_string)
             return
@@ -226,7 +247,7 @@ class Table:
         It is important that the number of columns match the number of data per input and
         that the type of the two parameters remain iterables either tuples or lists """
 
-        if len(columns) == 0:
+        if len(data) == 0:
             raise ValueError('No record to be added')
         elif len(columns) != len(data):
             raise ValueError('Number mismatch between columns and data')
