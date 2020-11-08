@@ -58,7 +58,7 @@ class Table:
 
     def create(self, default=True, p_key=None, **kwargs):
         """ Create one table at a time simply from the name of the initialisation of the object
-        You can also create your own primary key, just set uid=False, and indicate the column that
+        You can also create your own primary key, just set default=False, and indicate the column that
         will be the primary key. Beware: this action will not set the auto_increment option to your
         primary key. """
 
