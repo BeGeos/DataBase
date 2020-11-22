@@ -7,10 +7,11 @@ import config
     # Decide whether to launch the query or create the SQL code to be displayed.
     # There can be many reasons to use the create method, for example, in case only the
     # string is actually needed.
-    >>> join_object.launch() # execute the query
-    >>> join_object.create() # provide the SQL text of the query
+    >>> join_object.global_search() # execute the query
+    >>> join_object.join_some('table_1', 'table_2') # provides the SQL text of the query to join table_1 and table_2
+    >>> join_object.join_all() # yields the query string to join all tables in the database
 
-    # Reminder: to visualise the SQL query, echo must be set to True and the method create()
+    # Reminder: to visualise the SQL query, echo must be set to True and the method either join_some() or join_all()
 
     @BeGeos """
 
@@ -19,10 +20,11 @@ import config
 
 
 class JOIN:
-    """ This can be used with a generic database and it will create a query to join all the tables in that database.
-        It uses a combination of primary keys and foreign keys. Therefore, it has one main rule: the name of primary
-        key in Table A must be identical to the foreign key in Table B which is referring to. Besides being a best
-        practice, this should be something to include when designing any database. """
+    """ This can be used with a generic database and it will create a query to join all the tables, or
+        certain specified tables, in that database.It uses a combination of primary keys and foreign keys.
+        Therefore, it has one main rule: the name of primary key in Table A must be identical to the foreign
+        key in Table B which is referring to. Besides being a best practice, this should be something to include
+        when designing any database. """
 
     def __init__(self, dbname, echo=False):
         self.dbname = dbname
@@ -39,12 +41,21 @@ class JOIN:
         return self.cur.fetchall()
 
     def table_finder(self):
+        """ It finds all the tables on the database and their columns """
         result = {}
         self.cur.execute('SHOW TABLES')
         results = self.cur.fetchall()
         for each in results:
             info = JOIN.describe(self, each[0])
             result[each[0]] = info
+        return result
+
+    def find_columns_in_table(self, *args):
+        """ It finds information about selected tables in args argument """
+        result = {}
+        for each in args:
+            tab = JOIN.describe(self, each)
+            result[each] = tab
         return result
 
     @staticmethod
@@ -118,17 +129,36 @@ class JOIN:
             return
         return query_string
 
-    def create(self):
+    def join_all(self):
         tables = JOIN.table_finder(self)
         p_keys = JOIN.primary_key_finder(tables)
         return JOIN.walk_tables(self, tables, p_keys)
 
-    def launch(self):
+    def join_some(self, *args):
+        if not args:
+            raise AttributeError
+        tables = JOIN.find_columns_in_table(self, *args)
+        p_keys = JOIN.primary_key_finder(tables)
+        return JOIN.walk_tables(self, tables, p_keys)
+
+    def global_search(self):
+        """ It will give all the records in all the tables because it utilises the join_all method """
         if not self.echo:
-            query = JOIN.create(self)
+            query = JOIN.join_all(self)
             self.cur.execute(query)
             records = self.cur.fetchall()
             for record in records:
                 print(record)
             return
-        print('To view SQL use create()')
+        print('To view SQL use join_all or join_some methods')
+
+    def local_search(self, *args):
+        """ It will give all the records in the given tables because it utilises the join_some method """
+        if not self.echo:
+            query = JOIN.join_some(self, *args)
+            self.cur.execute(query)
+            records = self.cur.fetchall()
+            for record in records:
+                print(record)
+            return
+        print('To view SQL use join_all or join_some methods')
