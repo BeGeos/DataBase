@@ -1,5 +1,5 @@
 import mysql.connector
-from Database import config
+import config
 
 """" Underneath an example of the correct syntax to use this class 
     # Create an object JOIN 
@@ -61,6 +61,9 @@ class JOIN:
         return primary_keys
 
     def walk_tables(self, table: dict, primary_keys: dict):
+        """Walk tables in a database to create the query and join all tables"""
+
+        """Create the dict with table: [list of columns]"""
         all_tables_columns = {}
         tmp_cols = []
         for key in table:
@@ -68,21 +71,26 @@ class JOIN:
                 tmp_cols.append(columns[0])
             all_tables_columns[key] = tmp_cols
             tmp_cols = []
-        list_tables = list(all_tables_columns.keys())
+        list_tables = list(all_tables_columns.keys())  # Temporary just to get the start table
         del tmp_cols
 
+        """ Create a list of primary keys from the dictionary, making sure to just take it once.
+        It is a 2 step process because some tables have multiple primary keys and the return 
+        is a list """
         tmp_list_pk = []
         for each in primary_keys.values():
             for e in each:
                 if e not in tmp_list_pk:
                     tmp_list_pk.append(e)
 
+        """ Initialise the elements for the process """
         connections = {}
         next_step = []
         start_table = list_tables[0]
         next_step.append(start_table)
         del list_tables
 
+        """ - Main process - """
         query_string = 'SELECT * FROM ' + start_table + '\n'
         while len(next_step) > 0:
             tmp = {}
@@ -103,6 +111,8 @@ class JOIN:
             query_string += "JOIN " + k + " USING (" + v + ")\n"
 
         del connections
+
+        """ Just print the query string to be put in a SQL manager"""
         if self.echo:
             print(query_string)
             return
