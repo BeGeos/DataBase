@@ -117,11 +117,11 @@ It inserts columns into a table. It is recommended to insert one column at a tim
 in mysql a data type must be provided.
 
 	column: It's the name the column will have. 
-<<<<<<< HEAD
+
 	d_type: The data type of the column. To see data types accepted in mysql, please 		refer to "create" (method) above
 =======
 	d_type: The data type of the column. To see data types accepted in mysql, please refer to "create" (method) above
->>>>>>> 192d084d50e690f91811e27e5327931d58ce6b90
+
 
 >>> emp.insert_column("role", "varchar(20)")
 'role' added successfully
