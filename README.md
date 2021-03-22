@@ -141,8 +141,8 @@ the instance itself reinitialising it, so that all the attributes are updated.
   refer to "create" (method) above
   
 
-    >>> emp.insert_column("role", "varchar(20)")
-    'role' added successfully
+        >>> emp.insert_column("role", "varchar(20)")
+        'role' added successfully
 
 * **insert_foreign_key**(self, column_fk, table_name, d_type): method
 
@@ -159,8 +159,8 @@ the instance itself reinitialising it, so that all the attributes are updated.
 		but it provides a bit of flexibility
     
 
-    >>> emp.insert_foreign_key("branch_id", "Branch", "int")
-    Foreign key added successfully
+        >>> emp.insert_foreign_key("branch_id", "Branch", "int")
+        Foreign key added successfully
 
 * **many_to_many**(self, keys: tuple or list, d_type: tuple or list): method
 
@@ -179,9 +179,9 @@ the instance itself reinitialising it, so that all the attributes are updated.
 		it is always better to have some flexibility
 
 
-    >>> many_rel = Table("my_db", "ManyToMany")
-    >>> many_rel.many_to_many(("Employees.employees_id", "Branch.branch_id"), ("int", "int"))
-    'ManyToMany' created successfully
+        >>> many_rel = Table("my_db", "ManyToMany")
+        >>> many_rel.many_to_many(("Employees.employees_id", "Branch.branch_id"), ("int", "int"))
+        'ManyToMany' created successfully
 
 This operation has created a table named ManyToMany with 2 columns: employees_id and branch_id.
 The combination of this 2 columns will be unique an it is used to resolve many to many relationships.
@@ -196,8 +196,8 @@ The combination of this 2 columns will be unique an it is used to resolve many t
   * **column**: it refers to the column to be deleted. The table is inferred from the instance
     
 
-    >>> emp.delete_column("phone")
-    'phone' deleted successfully
+        >>> emp.delete_column("phone")
+        'phone' deleted successfully
 
 * **rename_column**(self, old_name, new_name): method
 
@@ -208,8 +208,8 @@ The combination of this 2 columns will be unique an it is used to resolve many t
   * **new_name**: It is the new name the column will have. Don't use spaces, instead use _
 
 
-    >>> emp.rename_column("role", "position")
-    role renamed successfully into => position
+        >>> emp.rename_column("role", "position")
+        role renamed successfully into => position
 
 * **add_record**(self, columns: tuple or list, data: tuple or list): method
 
@@ -221,8 +221,8 @@ The combination of this 2 columns will be unique an it is used to resolve many t
   * **data**: The actual data that go into the columns
 
 
-    >>> emp.add_record(("first_name","last_name","phone"), ("John", "Smith", 1234567))
-    Data uploaded successfully
+        >>> emp.add_record(("first_name","last_name","phone"), ("John", "Smith", 1234567))
+        Data uploaded successfully
 
 It is important that the 2 arguments have the same length (number of parameters) or else the method will raise an error.
 In addition, if no argument is given it will raise an error, as well.
@@ -254,13 +254,13 @@ potentially take JSON files and directly upload them into a table.
   * __**kwargs__: Key arguments for conditions in the search
 
 
-    >>> emp.fetch()
-    [(1, 'John', 'Smith', 1234567, None, None)]
-    >>> emp.fetch(column=("first_name", "last_name")))
-    [('John', 'Smith')]
-    >>> emp = Table('testing_db', 'Employees', echo=True)
-    >>> emp.fetch(_and=True, id=1, first_name="John")
-    SELECT * FROM Employees WHERE id=1 AND first_name='John'
+        >>> emp.fetch()
+        [(1, 'John', 'Smith', 1234567, None, None)]
+        >>> emp.fetch(column=("first_name", "last_name")))
+        [('John', 'Smith')]
+        >>> emp = Table('testing_db', 'Employees', echo=True)
+        >>> emp.fetch(_and=True, id=1, first_name="John")
+        SELECT * FROM Employees WHERE id=1 AND first_name='John'
 
 * **join_search**(self, 
 		table, 
@@ -298,11 +298,11 @@ potentially take JSON files and directly upload them into a table.
   * __**kwargs__: Key arguments for conditions in the search
 
 
-    >>> emp.join_search(table="Address", f_key="address_id") 
-    [(1, 1, 'John', 'Smith', 1234567, None, 'Beverly Hills St', '90210', 'Los Angeles', 'USA', None)]
-    >>> emp = Table('testing_db', 'Employees', echo=True)
-    >>> emp.join_search(table="Address", f_key="address_id", column=("first_name", "last_name", "street"))
-    SELECT first_name, last_name, street FROM Employees JOIN Address USING (address_id)
+        >>> emp.join_search(table="Address", f_key="address_id") 
+        [(1, 1, 'John', 'Smith', 1234567, None, 'Beverly Hills St', '90210', 'Los Angeles', 'USA', None)]
+        >>> emp = Table('testing_db', 'Employees', echo=True)
+        >>> emp.join_search(table="Address", f_key="address_id", column=("first_name", "last_name", "street"))
+        SELECT first_name, last_name, street FROM Employees JOIN Address USING (address_id)
 
 * **regexp_search**(self, num=-1, **kwargs): method
 
@@ -317,10 +317,10 @@ potentially take JSON files and directly upload them into a table.
 		  be considered. The format is column="RegularExpression". 
 
 
-    >>> emp.regexp_search(first_name='^J') # mysql is not case sensitive
-    [(1, 'John', 'Smith', 1234567, None, 1)]
-    >>> emp.regexp_search(last_name='th')
-    [(1, 'John', 'Smith', 1234567, None, 1)]
+        >>> emp.regexp_search(first_name='^J') # mysql is not case sensitive
+        [(1, 'John', 'Smith', 1234567, None, 1)]
+        >>> emp.regexp_search(last_name='th')
+        [(1, 'John', 'Smith', 1234567, None, 1)]
 
 * **update_record**(self, column, new_data, _and=False, _or=False, **kwargs): method
 
